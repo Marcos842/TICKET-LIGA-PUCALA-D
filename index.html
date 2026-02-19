@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liga Distrital de Fútbol de Pucalá</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="nav-brand">LIGA DISTRITAL DE FUTBOL DE PUCALA</div>
+        <div>
+            <button class="nav-btn active" onclick="cambiarVista('vender')">Vender</button>
+            <button class="nav-btn" onclick="cambiarVista('scan')">Escanear</button>
+            <button class="nav-btn" onclick="cambiarVista('admin')">Admin</button>
+        </div>
+    </div>
+
+    <div id="vender" class="view-section active">
+        <h2 style="border-bottom: 2px solid #ddd; padding-bottom: 10px;">Nueva Venta</h2>
+        <label style="font-weight: bold; margin-bottom: 5px; display: block;">Selecciona Club:</label>
+        <select id="selClub">
+            <option value="ACADEMIA PUCALA">ACADEMIA PUCALA</option>
+            <option value="REAL SIPAN">REAL SIPAN</option>
+            <option value="UNION SIPAN">UNION SIPAN</option>
+            <option value="DEPORTIVO SANTOS">DEPORTIVO SANTOS</option>
+            <option value="JUVENTUD LA CRIA">JUVENTUD LA CRIA</option>
+        </select>
+        
+        <button class="btn-main" onclick="procesarVenta()" id="btnVender">GENERAR TICKET (S/ 3.00)</button>
+
+        <div id="ticketContainer" style="display:none;">
+            <div id="ticketVisual" class="ticket-box">
+                <div class="t-header">LIGA DISTRITAL DE PUCALÁ</div>
+                <div style="font-weight: bold; color: #555;">CAMPEONATO OFICIAL</div>
+                <hr style="border:0; border-top:1px dashed #ccc; margin: 15px 0;">
+                <div class="t-club" id="txtClub">CLUB</div>
+                <div class="t-price">S/ 3.00</div>
+                <div class="qr-holder" id="qrDestino"></div>
+                <div class="t-id">ID: <span id="txtId">????</span></div>
+                <div style="font-size:0.8rem; color:#888; margin-top:10px;">Fecha: <span id="txtFecha">--</span></div>
+            </div>
+            <button class="btn-sec" onclick="bajarPDF()">📥 Descargar PDF</button>
+        </div>
+    </div>
+
+    <div id="scan" class="view-section">
+        <h2 style="border-bottom: 2px solid #ddd; padding-bottom: 10px;">Control de Acceso</h2>
+        <div class="camera-box">
+            <div id="loadingInfo" style="color:white; text-align:center; padding-top:130px;">Activando cámara...</div>
+            <canvas id="canvas" hidden></canvas>
+        </div>
+        <div id="resultadoScan" class="scan-msg">Esperando QR...</div>
+        <button class="btn-sec" onclick="iniciarCamara()" style="margin-top: 20px;">🔄 Iniciar / Reiniciar Cámara</button>
+    </div>
+
+    <div id="admin" class="view-section">
+        <h2 style="border-bottom: 2px solid #ddd; padding-bottom: 10px;">Panel de Administración</h2>
+        <div class="stat-card">
+            <div class="stat-num" id="stHoy">0</div>
+            <div class="stat-label">Vendidos HOY</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-num" style="color:#0f9d58;" id="stDinero">S/ 0.00</div>
+            <div class="stat-label">Recaudación Total</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-num" style="color:#333;" id="stTotal">0</div>
+            <div class="stat-label">Total Entradas Históricas</div>
+        </div>
+
+        <h3 style="margin-top: 30px;">Ranking de Demanda por Club</h3>
+        <div class="ranking-container" id="rankingClubes">
+            <p style="text-align: center; color: #666;">Cargando ranking...</p>
+        </div>
+
+        <button class="btn-main" onclick="cargarAdmin()" id="btnActualizarAdmin">🔄 Actualizar Datos</button>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
