@@ -76,7 +76,7 @@ function accederApp(desdeMemoria) {
 }
 
 function cerrarSesion() {
-    apagarCamara(); // Apaga la cámara antes de salir
+    apagarCamara(); 
     usuarioActual = ""; rolActual = "";
     localStorage.removeItem('ligaUsuario');
     localStorage.removeItem('ligaRol');
@@ -89,7 +89,6 @@ function cambiarVista(id) {
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     
-    // Si salimos de la pestaña de escáner, apagamos la cámara para ahorrar batería
     if (id !== 'scan') {
         apagarCamara();
     }
@@ -97,12 +96,22 @@ function cambiarVista(id) {
     if (id === 'vender') document.getElementById('navVender').classList.add('active');
     if (id === 'scan') {
         document.getElementById('navScan').classList.add('active');
-        iniciarCamara(); // Fuerza el reinicio de la cámara al entrar a la vista
+        iniciarCamara(); 
     }
     if (id === 'admin') {
         document.getElementById('navAdmin').classList.add('active');
         cargarAdmin();
     }
+}
+
+// --- GENERADOR DE CÓDIGO ÚNICO (5 CARACTERES) ---
+function generarCodigoUnico() {
+    const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let codigo = '';
+    for (let i = 0; i < 5; i++) {
+        codigo += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+    }
+    return codigo;
 }
 
 // --- 1. VENDER TICKETS (SOPORTE MASIVO) ---
@@ -115,9 +124,9 @@ async function procesarVenta() {
     btn.innerText = `Generando ${cantidad} ticket(s)...`;
 
     const loteTickets = [];
-    const timestamp = Date.now();
     for(let i = 0; i < cantidad; i++) {
-        loteTickets.push(`LP-${timestamp}-${i}`);
+        // Genera el ID corto de 5 caracteres
+        loteTickets.push(generarCodigoUnico());
     }
 
     const res = await fetchAPI({ 
@@ -133,7 +142,7 @@ async function procesarVenta() {
         alert("Error al registrar la venta masiva.");
     }
     btn.disabled = false; 
-    btn.innerText = "GENERAR TICKET (S/ 3.00)";
+    btn.innerText = "GENERAR TICKETS (S/ 3.00)";
 }
 
 async function generarDocumentoVenta(tickets) {
@@ -151,16 +160,27 @@ async function generarDocumentoVenta(tickets) {
         await new Promise(r => setTimeout(r, 100));
         const imgData = qrTemp.querySelector('img').src;
 
+        // --- DISEÑO DEL PDF RECALCULADO ---
         pdf.setFontSize(10);
         pdf.text("LIGA DISTRITAL DE FUTBOL PUCALA", 10, 15);
         pdf.setFontSize(14);
         pdf.text(`CLUB: ${t.club}`, 10, 25);
+        
+        // Subimos la fecha y vendedor al espacio que dejó el ID
         pdf.setFontSize(9);
-        pdf.text(`ID: ${t.id}`, 10, 32);
-        pdf.text(`FECHA: ${t.fecha}`, 10, 37);
-        pdf.text(`VENDEDOR: ${usuarioActual}`, 10, 42);
-        pdf.addImage(imgData, 'PNG', 20, 50, 65, 65);
-        pdf.text("VALOR: S/ 3.00", 40, 125);
+        pdf.text(`FECHA: ${t.fecha}`, 10, 32);
+        pdf.text(`VENDEDOR: ${usuarioActual}`, 10, 37);
+        
+        // Reducimos el tamaño del QR (de 65x65 a 45x45) y lo centramos (Eje X: 30)
+        pdf.addImage(imgData, 'PNG', 30, 45, 45, 45);
+        
+        // Posicionamos el ID de 5 caracteres debajo del QR, centrado
+        pdf.setFontSize(14);
+        pdf.text(`ID: ${t.id}`, 52.5, 98, { align: "center" });
+        
+        // Posicionamos el precio
+        pdf.setFontSize(10);
+        pdf.text("VALOR: S/ 3.00", 52.5, 105, { align: "center" });
     }
 
     pdf.save(`Tickets_${tickets[0].club}_${Date.now()}.pdf`);
@@ -175,7 +195,6 @@ let canvasElement = document.getElementById("canvas");
 let canvas = canvasElement.getContext("2d");
 let escaneando = false;
 
-// NUEVA FUNCIÓN: Detiene el hardware de la cámara correctamente
 function apagarCamara() {
     escaneando = false;
     if (video.srcObject) {
@@ -185,7 +204,7 @@ function apagarCamara() {
 }
 
 function iniciarCamara() {
-    apagarCamara(); // Limpia instancias previas por seguridad
+    apagarCamara(); 
     escaneando = true;
     
     let divResultado = document.getElementById('resultadoScan');
@@ -198,7 +217,6 @@ function iniciarCamara() {
     if (loadingInfo) loadingInfo.style.display = "block";
     canvasElement.hidden = true;
 
-    // Validación de entorno seguro (HTTPS)
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         divResultado.innerText = "Error: Navegador no soporta cámara o el sitio no es seguro (HTTPS)."; 
         divResultado.style.background = "#ea4335";
@@ -225,7 +243,6 @@ function loopCamara() {
     if (!escaneando) return;
     
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        // OCULTA EL MENSAJE DE CARGA CUANDO LA CÁMARA YA TIENE IMAGEN
         let loadingInfo = document.getElementById('loadingInfo');
         if (loadingInfo) loadingInfo.style.display = "none";
         
@@ -238,7 +255,7 @@ function loopCamara() {
         let code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
         
         if (code) { 
-            apagarCamara(); // Detiene el escáner para evitar múltiples lecturas del mismo QR
+            apagarCamara(); 
             verificarTicket(code.data); 
         }
     }
@@ -259,7 +276,6 @@ async function verificarTicket(id) {
         div.innerText = "Error validando en servidor."; div.style.background = "#ea4335"; div.style.color = "white";
     }
     
-    // Reinicia la cámara después de 3 segundos para el siguiente ticket
     setTimeout(() => { iniciarCamara(); }, 3000); 
 }
 
