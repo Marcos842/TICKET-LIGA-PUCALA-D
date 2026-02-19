@@ -24,7 +24,7 @@
             <label style="text-align: left; display: block; font-weight: bold; margin-bottom: 5px; margin-top: 15px;">Contraseña de Rol:</label>
             <input type="password" id="inputPass" placeholder="********" class="login-input">
             
-            <button class="btn-main" onclick="iniciarSesion()">INGRESAR</button>
+            <button class="btn-main" id="btnLogin" onclick="iniciarSesion()">INGRESAR</button>
         </div>
     </div>
 
@@ -69,7 +69,7 @@
         </div>
 
         <div id="scan" class="view-section">
-            <h2 style="border-bottom: 2px solid #ddd; padding-bottom: 10px;">Control de Acceso (Escáner)</h2>
+            <h2 style="border-bottom: 2px solid #ddd; padding-bottom: 10px;">Control de Acceso</h2>
             <div class="camera-box">
                 <div id="loadingInfo" style="color:white; text-align:center; padding-top:130px;">Activando cámara...</div>
                 <canvas id="canvas" hidden></canvas>
@@ -89,12 +89,13 @@
                 <div class="stat-label">Recaudación Total Histórica</div>
             </div>
 
-            <h3 style="margin-top: 30px;">Mini Ranking de Clubes</h3>
+            <h3 style="margin-top: 30px; margin-bottom: 5px;">Ranking General de Clubes</h3>
+            <p style="font-size: 0.8rem; color: #666; margin-bottom: 15px;">TOP 1 indicado con la corona 👑</p>
             <div class="ranking-container" id="rankingClubes">
                 <p style="text-align: center; color: #666;">Cargando ranking...</p>
             </div>
 
-            <button class="btn-main" onclick="cargarAdmin()" id="btnActualizarAdmin">🔄 Actualizar Datos</button>
+            <button class="btn-main" onclick="cargarAdmin()" id="btnActualizarAdmin" style="margin-top: 20px;">🔄 Actualizar Datos</button>
         </div>
     </div>
 
