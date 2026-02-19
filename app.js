@@ -125,7 +125,6 @@ async function procesarVenta() {
 
     const loteTickets = [];
     for(let i = 0; i < cantidad; i++) {
-        // Genera el ID corto de 5 caracteres
         loteTickets.push(generarCodigoUnico());
     }
 
@@ -147,7 +146,9 @@ async function procesarVenta() {
 
 async function generarDocumentoVenta(tickets) {
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p', 'mm', 'a6');
+    
+    // CAMBIO TÉCNICO: Formato A7 (74 mm x 105 mm) - Más pequeño y portable
+    const pdf = new jsPDF('p', 'mm', 'a7'); 
     const qrTemp = document.createElement("div");
 
     for (let i = 0; i < tickets.length; i++) {
@@ -160,27 +161,27 @@ async function generarDocumentoVenta(tickets) {
         await new Promise(r => setTimeout(r, 100));
         const imgData = qrTemp.querySelector('img').src;
 
-        // --- DISEÑO DEL PDF RECALCULADO ---
-        pdf.setFontSize(10);
-        pdf.text("LIGA DISTRITAL DE FUTBOL PUCALA", 10, 15);
+        // --- DISEÑO ESCALADO Y CENTRADO MATEMÁTICAMENTE ---
+        const centroX = 37; // La mitad de 74mm (Ancho del A7)
+
+        pdf.setFontSize(8);
+        pdf.text("LIGA DISTRITAL DE FUTBOL PUCALA", centroX, 12, { align: "center" });
+        
+        pdf.setFontSize(11);
+        pdf.text(`CLUB: ${t.club}`, centroX, 20, { align: "center" });
+        
+        pdf.setFontSize(7);
+        pdf.text(`FECHA: ${t.fecha}`, centroX, 26, { align: "center" });
+        pdf.text(`VENDEDOR: ${usuarioActual}`, centroX, 30, { align: "center" });
+        
+        // QR Reducido a 32x32 mm. Para centrarlo: 37 - (32/2) = 21
+        pdf.addImage(imgData, 'PNG', 21, 35, 32, 32);
+        
         pdf.setFontSize(14);
-        pdf.text(`CLUB: ${t.club}`, 10, 25);
+        pdf.text(`ID: ${t.id}`, centroX, 75, { align: "center" });
         
-        // Subimos la fecha y vendedor al espacio que dejó el ID
-        pdf.setFontSize(9);
-        pdf.text(`FECHA: ${t.fecha}`, 10, 32);
-        pdf.text(`VENDEDOR: ${usuarioActual}`, 10, 37);
-        
-        // Reducimos el tamaño del QR (de 65x65 a 45x45) y lo centramos (Eje X: 30)
-        pdf.addImage(imgData, 'PNG', 30, 45, 45, 45);
-        
-        // Posicionamos el ID de 5 caracteres debajo del QR, centrado
-        pdf.setFontSize(14);
-        pdf.text(`ID: ${t.id}`, 52.5, 98, { align: "center" });
-        
-        // Posicionamos el precio
         pdf.setFontSize(10);
-        pdf.text("VALOR: S/ 3.00", 52.5, 105, { align: "center" });
+        pdf.text("VALOR: S/ 3.00", centroX, 83, { align: "center" });
     }
 
     pdf.save(`Tickets_${tickets[0].club}_${Date.now()}.pdf`);
