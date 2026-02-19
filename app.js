@@ -1,16 +1,16 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzv8t19bqLaegVup1ICK1xaJeQmbZvFWHfRPNHdm6-uTUTB6Ow8rgZdE497_B1jG3VIyw/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby5I_Cq4yBDPtDuAB9Wfc2DWg9J9V0bB4FmCBxBLV6cHOCOvmUsPGcnrG9MvYqAKM04hQ/exec";
 
 let usuarioActual = "";
 let rolActual = ""; 
 
-// --- RECUPERACIÓN DE SESIÓN (Evita perder datos al recargar F5) ---
+// --- RECUPERACIÓN DE SESIÓN ---
 window.onload = function() {
     const usrGuardado = localStorage.getItem('ligaUsuario');
     const rolGuardado = localStorage.getItem('ligaRol');
     if (usrGuardado && rolGuardado) {
         usuarioActual = usrGuardado;
         rolActual = rolGuardado;
-        accederApp(true); // Entra directo sin preguntar al Drive
+        accederApp(true);
     }
 }
 
@@ -29,7 +29,7 @@ async function fetchAPI(payload) {
     }
 }
 
-// --- SISTEMA DE LOGIN CON VALIDACIÓN DE DUPLICADOS ---
+// --- SISTEMA DE LOGIN ---
 async function iniciarSesion() {
     const nombre = document.getElementById('inputNombre').value.trim();
     const pass = document.getElementById('inputPass').value.trim();
@@ -42,23 +42,16 @@ async function iniciarSesion() {
     else if (pass === "scan2026") rolCalculado = "VENDEDOR";
     else { alert("Contraseña incorrecta."); return; }
 
-    // Cambiar estado del botón
-    btn.innerText = "Verificando nombre en Drive...";
+    btn.innerText = "Verificando nombre...";
     btn.disabled = true;
 
-    // Preguntar al servidor si el nombre ya existe
     const res = await fetchAPI({ accion: "registrar_login", usuario: nombre, rol: rolCalculado });
 
     btn.disabled = false;
     btn.innerText = "INGRESAR";
 
-    if (res.error) {
-        // Muestra alerta si el usuario está duplicado
-        alert(res.error); 
-        return; 
-    }
+    if (res.error) { alert(res.error); return; }
 
-    // Si todo sale bien, guardar sesión localmente y entrar
     usuarioActual = nombre;
     rolActual = rolCalculado;
     localStorage.setItem('ligaUsuario', nombre);
@@ -86,15 +79,10 @@ function cerrarSesion() {
     usuarioActual = ""; rolActual = "";
     localStorage.removeItem('ligaUsuario');
     localStorage.removeItem('ligaRol');
-    
-    document.getElementById('inputNombre').value = "";
-    document.getElementById('inputPass').value = "";
-    document.getElementById('appContainer').style.display = 'none';
-    document.getElementById('loginSection').style.display = 'flex';
-    if(escaneando) escaneando = false; 
+    location.reload(); 
 }
 
-// --- NAVEGACIÓN INTERNA ---
+// --- NAVEGACIÓN ---
 function cambiarVista(id) {
     document.querySelectorAll('.view-section').forEach(d => d.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -111,41 +99,72 @@ function cambiarVista(id) {
     }
 }
 
-// --- 1. VENDER TICKET ---
+// --- 1. VENDER TICKETS (SOPORTE MASIVO) ---
 async function procesarVenta() {
     const btn = document.getElementById('btnVender');
     const club = document.getElementById('selClub').value;
+    const cantidad = parseInt(document.getElementById('selCantidad')?.value || 1);
     
-    btn.disabled = true; btn.innerText = "Registrando en Drive...";
+    btn.disabled = true; 
+    btn.innerText = `Generando ${cantidad} ticket(s)...`;
 
-    const res = await fetchAPI({ accion: "generar", club: club, usuario: usuarioActual });
+    // Preparar lote de IDs
+    const loteTickets = [];
+    const timestamp = Date.now();
+    for(let i=0; i<cantidad; i++) {
+        loteTickets.push(`LP-${timestamp}-${i}`);
+    }
+
+    // Llamada al backend optimizada
+    const res = await fetchAPI({ 
+        accion: "generar_masivo", 
+        club: club, 
+        usuario: usuarioActual,
+        ids: loteTickets 
+    });
 
     if (res && !res.error) {
-        document.getElementById('txtClub').innerText = res.club;
-        document.getElementById('txtId').innerText = res.id;
-        document.getElementById('txtFecha').innerText = res.fecha;
-        document.getElementById('txtVendedorTicket').innerText = usuarioActual;
-        
-        document.getElementById('qrDestino').innerHTML = "";
-        new QRCode(document.getElementById('qrDestino'), { text: res.id, width: 150, height: 150 });
-        document.getElementById('ticketContainer').style.display = 'block';
+        generarDocumentoVenta(res.tickets);
     } else {
-        alert("Error al registrar la venta.");
+        alert("Error al registrar la venta masiva.");
     }
-    btn.disabled = false; btn.innerText = "GENERAR TICKET (S/ 3.00)";
+    btn.disabled = false; 
+    btn.innerText = "GENERAR TICKET (S/ 3.00)";
 }
 
-function bajarPDF() {
+async function generarDocumentoVenta(tickets) {
     const { jsPDF } = window.jspdf;
-    const elemento = document.getElementById('ticketVisual');
-    html2canvas(elemento, { scale: 3 }).then(canvas => {
-        const img = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a6');
-        const ancho = pdf.internal.pageSize.getWidth();
-        const alto = (canvas.height * ancho) / canvas.width;
-        pdf.addImage(img, 'PNG', 0, 10, ancho, alto);
-        pdf.save(`Ticket_${document.getElementById('txtId').innerText}.pdf`);
-    });
+    const pdf = new jsPDF('p', 'mm', 'a6');
+    const qrTemp = document.createElement("div");
+
+    for (let i = 0; i < tickets.length; i++) {
+        const t = tickets[i];
+        if (i > 0) pdf.addPage();
+
+        // Limpiar y generar nuevo QR
+        qrTemp.innerHTML = "";
+        new QRCode(qrTemp, { text: t.id, width: 200, height: 200 });
+        
+        // Pausa técnica para render de QR
+        await new Promise(r => setTimeout(r, 100));
+        const imgData = qrTemp.querySelector('img').src;
+
+        // Diseño del PDF
+        pdf.setFontSize(10);
+        pdf.text("LIGA DISTRITAL DE FUTBOL PUCALA", 10, 15);
+        pdf.setFontSize(14);
+        pdf.text(`CLUB: ${t.club}`, 10, 25);
+        pdf.setFontSize(9);
+        pdf.text(`ID: ${t.id}`, 10, 32);
+        pdf.text(`FECHA: ${t.fecha}`, 10, 37);
+        pdf.text(`VENDEDOR: ${usuarioActual}`, 10, 42);
+        pdf.addImage(imgData, 'PNG', 20, 50, 65, 65);
+        pdf.text("VALOR: S/ 3.00", 40, 125);
+    }
+
+    pdf.save(`Tickets_${tickets[0].club}_${Date.now()}.pdf`);
+    alert(`Se han generado exitosamente ${tickets.length} tickets.`);
+    document.getElementById('ticketContainer').style.display = 'none'; // Reset vista
 }
 
 // --- 2. ESCÁNER (CÁMARA) ---
@@ -157,48 +176,49 @@ let escaneando = false;
 function iniciarCamara() {
     escaneando = true;
     let divResultado = document.getElementById('resultadoScan');
-    divResultado.innerText = "Buscando QR..."; divResultado.style.background = "#ddd"; divResultado.style.color = "black";
+    divResultado.innerText = "Buscando QR..."; divResultado.style.background = "#ddd"; 
     
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
         video.srcObject = stream; video.setAttribute("playsinline", true); video.play();
         requestAnimationFrame(loopCamara);
     }).catch(err => {
-        divResultado.innerText = "Permiso de cámara denegado."; divResultado.style.background = "#ea4335"; divResultado.style.color = "white";
+        divResultado.innerText = "Permiso de cámara denegado."; divResultado.style.background = "#ea4335";
     });
 }
 
 function loopCamara() {
     if (!escaneando) return;
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        document.getElementById("loadingInfo").hidden = true; canvasElement.hidden = false;
         canvasElement.height = video.videoHeight; canvasElement.width = video.videoWidth;
         canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-        
         let imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
         let code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-        if (code) { escaneando = false; verificarTicket(code.data); }
+        if (code) { 
+            escaneando = false; 
+            if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
+            verificarTicket(code.data); 
+        }
     }
     if(escaneando) requestAnimationFrame(loopCamara);
 }
 
 async function verificarTicket(id) {
     let div = document.getElementById('resultadoScan');
-    div.innerText = "Verificando en Drive: " + id + "..."; div.style.background = "#fbbc04"; div.style.color = "black";
+    div.innerText = "Verificando: " + id; div.style.background = "#fbbc04";
 
     const res = await fetchAPI({ accion: "validar", id: id, usuario: usuarioActual });
 
     if (res && !res.error) {
         div.innerText = res.msg; div.style.background = res.color; div.style.color = "white";
         if (navigator.vibrate) navigator.vibrate(300); 
-    } else {
-        div.innerText = "Error de conexión."; div.style.background = "#ea4335";
     }
+    setTimeout(() => { if(!escaneando) iniciarCamara(); }, 3000); // Reinicia cámara tras 3 seg
 }
 
 // --- 3. ADMIN Y RANKING ---
 async function cargarAdmin() {
     const btn = document.getElementById('btnActualizarAdmin');
-    btn.innerText = "Cargando datos del Drive..."; btn.disabled = true;
+    btn.innerText = "Cargando..."; btn.disabled = true;
 
     const res = await fetchAPI({ accion: "dashboard" });
 
@@ -209,12 +229,7 @@ async function cargarAdmin() {
         let htmlRanking = "";
         res.ranking.forEach((item, index) => {
             let esTop1 = index === 0 && item.cantidad > 0 ? "top-1" : "";
-            let icono = "";
-            if (index === 0 && item.cantidad > 0) icono = "👑";
-            else if (index === 1 && item.cantidad > 0) icono = "🥈";
-            else if (index === 2 && item.cantidad > 0) icono = "🥉";
-            else icono = "▪️";
-
+            let icono = (index === 0 && item.cantidad > 0) ? "👑" : "▪️";
             htmlRanking += `
                 <div class="ranking-item ${esTop1}">
                     <span class="ranking-club">${icono} ${item.club}</span>
