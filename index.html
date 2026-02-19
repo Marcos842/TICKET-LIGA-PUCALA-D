@@ -41,18 +41,32 @@
 
         <div id="vender" class="view-section">
             <h2 style="border-bottom: 2px solid #ddd; padding-bottom: 10px;">Generador de Tickets</h2>
-            <label style="font-weight: bold; margin-bottom: 5px; display: block;">Selecciona Club:</label>
-            <select id="selClub">
-                <option value="ACADEMIA PUCALA">ACADEMIA PUCALA</option>
-                <option value="REAL SIPAN">REAL SIPAN</option>
-                <option value="UNION SIPAN">UNION SIPAN</option>
-                <option value="DEPORTIVO SANTOS">DEPORTIVO SANTOS</option>
-                <option value="JUVENTUD LA CRIA">JUVENTUD LA CRIA</option>
-            </select>
             
-            <button class="btn-main" onclick="procesarVenta()" id="btnVender">GENERAR TICKET (S/ 3.00)</button>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="font-weight: bold; margin-bottom: 5px; display: block;">Selecciona Club:</label>
+                    <select id="selClub" style="width: 100%;">
+                        <option value="ACADEMIA PUCALA">ACADEMIA PUCALA</option>
+                        <option value="REAL SIPAN">REAL SIPAN</option>
+                        <option value="UNION SIPAN">UNION SIPAN</option>
+                        <option value="DEPORTIVO SANTOS">DEPORTIVO SANTOS</option>
+                        <option value="JUVENTUD LA CRIA">JUVENTUD LA CRIA</option>
+                    </select>
+                </div>
+                <div style="width: 120px;">
+                    <label style="font-weight: bold; margin-bottom: 5px; display: block;">Cantidad:</label>
+                    <select id="selCantidad" style="width: 100%;">
+                        <option value="1">1 Ticket</option>
+                        <option value="10">10 Und</option>
+                        <option value="20">20 Und</option>
+                        <option value="30">30 Und</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button class="btn-main" onclick="procesarVenta()" id="btnVender">GENERAR TICKETS (S/ 3.00 c/u)</button>
 
-            <div id="ticketContainer" style="display:none;">
+            <div id="ticketContainer" style="display:none; margin-top: 20px;">
                 <div id="ticketVisual" class="ticket-box">
                     <div class="t-header">LIGA DISTRITAL DE PUCALÁ</div>
                     <div style="font-weight: bold; color: #555;">CAMPEONATO OFICIAL</div>
@@ -64,7 +78,6 @@
                     <div style="font-size:0.8rem; color:#888; margin-top:10px;">Fecha: <span id="txtFecha">--</span></div>
                     <div style="font-size:0.7rem; color:#888; margin-top:5px;">Vendedor: <span id="txtVendedorTicket">--</span></div>
                 </div>
-                <button class="btn-sec" onclick="bajarPDF()">📥 Descargar PDF para Cliente</button>
             </div>
         </div>
 
