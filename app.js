@@ -24,7 +24,7 @@ async function fetchAPI(payload) {
         });
         return await response.json();
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Error API:", error);
         return { error: "Error de red. Verifique su conexión." };
     }
 }
@@ -42,7 +42,7 @@ async function iniciarSesion() {
     else if (pass === "scan2026") rolCalculado = "VENDEDOR";
     else { alert("Contraseña incorrecta."); return; }
 
-    btn.innerText = "Verificando nombre...";
+    btn.innerText = "Verificando...";
     btn.disabled = true;
 
     const res = await fetchAPI({ accion: "registrar_login", usuario: nombre, rol: rolCalculado });
@@ -76,6 +76,7 @@ function accederApp(desdeMemoria) {
 }
 
 function cerrarSesion() {
+    apagarCamara(); // Apaga la cámara antes de salir
     usuarioActual = ""; rolActual = "";
     localStorage.removeItem('ligaUsuario');
     localStorage.removeItem('ligaRol');
@@ -88,10 +89,15 @@ function cambiarVista(id) {
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     
+    // Si salimos de la pestaña de escáner, apagamos la cámara para ahorrar batería
+    if (id !== 'scan') {
+        apagarCamara();
+    }
+
     if (id === 'vender') document.getElementById('navVender').classList.add('active');
     if (id === 'scan') {
         document.getElementById('navScan').classList.add('active');
-        if (!escaneando) iniciarCamara();
+        iniciarCamara(); // Fuerza el reinicio de la cámara al entrar a la vista
     }
     if (id === 'admin') {
         document.getElementById('navAdmin').classList.add('active');
@@ -108,14 +114,12 @@ async function procesarVenta() {
     btn.disabled = true; 
     btn.innerText = `Generando ${cantidad} ticket(s)...`;
 
-    // Preparar lote de IDs
     const loteTickets = [];
     const timestamp = Date.now();
-    for(let i=0; i<cantidad; i++) {
+    for(let i = 0; i < cantidad; i++) {
         loteTickets.push(`LP-${timestamp}-${i}`);
     }
 
-    // Llamada al backend optimizada
     const res = await fetchAPI({ 
         accion: "generar_masivo", 
         club: club, 
@@ -141,15 +145,12 @@ async function generarDocumentoVenta(tickets) {
         const t = tickets[i];
         if (i > 0) pdf.addPage();
 
-        // Limpiar y generar nuevo QR
         qrTemp.innerHTML = "";
         new QRCode(qrTemp, { text: t.id, width: 200, height: 200 });
         
-        // Pausa técnica para render de QR
         await new Promise(r => setTimeout(r, 100));
         const imgData = qrTemp.querySelector('img').src;
 
-        // Diseño del PDF
         pdf.setFontSize(10);
         pdf.text("LIGA DISTRITAL DE FUTBOL PUCALA", 10, 15);
         pdf.setFontSize(14);
@@ -164,55 +165,102 @@ async function generarDocumentoVenta(tickets) {
 
     pdf.save(`Tickets_${tickets[0].club}_${Date.now()}.pdf`);
     alert(`Se han generado exitosamente ${tickets.length} tickets.`);
-    document.getElementById('ticketContainer').style.display = 'none'; // Reset vista
+    const tc = document.getElementById('ticketContainer');
+    if(tc) tc.style.display = 'none';
 }
 
-// --- 2. ESCÁNER (CÁMARA) ---
+// --- 2. ESCÁNER (CÁMARA) MEJORADO ---
 let video = document.createElement("video");
 let canvasElement = document.getElementById("canvas");
 let canvas = canvasElement.getContext("2d");
 let escaneando = false;
 
+// NUEVA FUNCIÓN: Detiene el hardware de la cámara correctamente
+function apagarCamara() {
+    escaneando = false;
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+}
+
 function iniciarCamara() {
+    apagarCamara(); // Limpia instancias previas por seguridad
     escaneando = true;
+    
     let divResultado = document.getElementById('resultadoScan');
-    divResultado.innerText = "Buscando QR..."; divResultado.style.background = "#ddd"; 
+    let loadingInfo = document.getElementById('loadingInfo');
+    
+    divResultado.innerText = "Iniciando cámara..."; 
+    divResultado.style.background = "#ddd"; 
+    divResultado.style.color = "black";
+    
+    if (loadingInfo) loadingInfo.style.display = "block";
+    canvasElement.hidden = true;
+
+    // Validación de entorno seguro (HTTPS)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        divResultado.innerText = "Error: Navegador no soporta cámara o el sitio no es seguro (HTTPS)."; 
+        divResultado.style.background = "#ea4335";
+        divResultado.style.color = "white";
+        if (loadingInfo) loadingInfo.style.display = "none";
+        return;
+    }
     
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
-        video.srcObject = stream; video.setAttribute("playsinline", true); video.play();
+        video.srcObject = stream; 
+        video.setAttribute("playsinline", true); 
+        video.play();
         requestAnimationFrame(loopCamara);
     }).catch(err => {
-        divResultado.innerText = "Permiso de cámara denegado."; divResultado.style.background = "#ea4335";
+        console.error("Error acceso cámara:", err);
+        divResultado.innerText = "Permiso denegado o cámara en uso."; 
+        divResultado.style.background = "#ea4335";
+        divResultado.style.color = "white";
+        if (loadingInfo) loadingInfo.style.display = "none";
     });
 }
 
 function loopCamara() {
     if (!escaneando) return;
+    
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvasElement.height = video.videoHeight; canvasElement.width = video.videoWidth;
+        // OCULTA EL MENSAJE DE CARGA CUANDO LA CÁMARA YA TIENE IMAGEN
+        let loadingInfo = document.getElementById('loadingInfo');
+        if (loadingInfo) loadingInfo.style.display = "none";
+        
+        canvasElement.hidden = false;
+        canvasElement.height = video.videoHeight; 
+        canvasElement.width = video.videoWidth;
         canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+        
         let imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
         let code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+        
         if (code) { 
-            escaneando = false; 
-            if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
+            apagarCamara(); // Detiene el escáner para evitar múltiples lecturas del mismo QR
             verificarTicket(code.data); 
         }
     }
+    
     if(escaneando) requestAnimationFrame(loopCamara);
 }
 
 async function verificarTicket(id) {
     let div = document.getElementById('resultadoScan');
-    div.innerText = "Verificando: " + id; div.style.background = "#fbbc04";
+    div.innerText = "Verificando: " + id; div.style.background = "#fbbc04"; div.style.color = "black";
 
     const res = await fetchAPI({ accion: "validar", id: id, usuario: usuarioActual });
 
     if (res && !res.error) {
         div.innerText = res.msg; div.style.background = res.color; div.style.color = "white";
         if (navigator.vibrate) navigator.vibrate(300); 
+    } else {
+        div.innerText = "Error validando en servidor."; div.style.background = "#ea4335"; div.style.color = "white";
     }
-    setTimeout(() => { if(!escaneando) iniciarCamara(); }, 3000); // Reinicia cámara tras 3 seg
+    
+    // Reinicia la cámara después de 3 segundos para el siguiente ticket
+    setTimeout(() => { iniciarCamara(); }, 3000); 
 }
 
 // --- 3. ADMIN Y RANKING ---
