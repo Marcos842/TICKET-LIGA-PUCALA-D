@@ -1,7 +1,17 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwckUuup4pvDDEeM1K2b-VY5aXxlRLDbE_bRWRW3jKcTv8g94kCCJ5Pdq7Qk8o3aiWNaw/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyPF_uAMJRqnxqh8_503OmU5qIIlHteNUAr7GBgg2WF1z4JBbi8_K2zBTCKyaaQ4furlQ/exec";
 
 let usuarioActual = "";
 let rolActual = ""; 
+
+// --- NUEVO: ESTADO DEL MINI-DASHBOARD LOCAL ---
+let statsLocal = {
+    fecha: new Date().toLocaleDateString(),
+    meta: 100,
+    qr: 0,
+    jugador: 0,
+    directiva: 0,
+    presidente: 0
+};
 
 // --- INICIALIZACIÓN Y RECUPERACIÓN DE SESIÓN ---
 window.onload = function() {
@@ -28,6 +38,9 @@ window.onload = function() {
             }
         });
     }
+
+    // 3. Inicializar Estadísticas del Vendedor
+    inicializarEstadisticas();
 }
 
 // --- COMUNICACIÓN CON BACKEND ---
@@ -112,6 +125,7 @@ function cambiarVista(id) {
     if (id === 'vender') document.getElementById('navVender').classList.add('active');
     if (id === 'scan') {
         document.getElementById('navScan').classList.add('active');
+        actualizarUIProgreso(); // Fuerza refresco visual al entrar
         iniciarCamara(); 
     }
     if (id === 'admin') {
@@ -305,6 +319,11 @@ async function verificarTicket(id) {
 
     if (res && !res.error) {
         div.innerText = res.msg; div.style.background = res.color; div.style.color = "white";
+        
+        if (res.color === "#0f9d58") { 
+            incrementarContador('QR');
+        }
+        
         if (navigator.vibrate) navigator.vibrate(300); 
     } else {
         div.innerText = "Error validando en servidor."; div.style.background = "#ea4335"; div.style.color = "white";
@@ -313,7 +332,141 @@ async function verificarTicket(id) {
     setTimeout(() => { iniciarCamara(); }, 3000); 
 }
 
-// --- 3. ADMIN Y RANKING ---
+// --- 3. PASES DE CORTESÍA ---
+let rolCortesiaTemp = ""; 
+
+function abrirModalCortesia(rolSeleccionado) {
+    rolCortesiaTemp = rolSeleccionado;
+    document.getElementById('modalSubtitulo').innerText = "Rol Seleccionado: " + rolSeleccionado;
+    document.getElementById('inputNombreCortesia').value = ""; 
+    document.getElementById('modalCortesia').classList.add('active');
+    apagarCamara();
+}
+
+function cerrarModalCortesia() {
+    document.getElementById('modalCortesia').classList.remove('active');
+    rolCortesiaTemp = "";
+    if (document.getElementById('scan').classList.contains('active')) {
+        iniciarCamara();
+    }
+}
+
+async function enviarCortesia() {
+    const nombre = document.getElementById('inputNombreCortesia').value.trim();
+    const club = document.getElementById('selClubCortesia').value;
+    const btn = document.getElementById('btnEnviarCortesia');
+
+    if (!nombre) { alert("Por favor, ingresa el Nombre Completo."); return; }
+
+    btn.innerText = "Enviando...";
+    btn.disabled = true;
+
+    const res = await fetchAPI({
+        accion: "registro_libre",
+        nombre: nombre,
+        club: club,
+        rol_cortesia: rolCortesiaTemp,
+        usuario: usuarioActual
+    });
+
+    btn.innerText = "ENVIAR";
+    btn.disabled = false;
+
+    if (res && !res.error) {
+        alert("Pase de cortesía registrado exitosamente.");
+        incrementarContador(rolCortesiaTemp); 
+        cerrarModalCortesia(); 
+    } else {
+        alert(res.error || "Ocurrió un error al registrar.");
+    }
+}
+
+// --- NUEVO: CANDADO DE SEGURIDAD PARA META ---
+function abrirModalAuth() {
+    const inputMeta = document.getElementById('inputMetaTickets');
+    if (!inputMeta || !inputMeta.value || parseInt(inputMeta.value) <= 0) {
+        alert("Por favor, ingresa una meta válida (mayor a 0) antes de fijar.");
+        return;
+    }
+    document.getElementById('inputPassAuth').value = ""; // Limpiar clave anterior
+    document.getElementById('modalAuth').classList.add('active');
+    apagarCamara(); // Protege la batería y evita escaneos fantasmas
+}
+
+function cerrarModalAuth() {
+    document.getElementById('modalAuth').classList.remove('active');
+    if (document.getElementById('scan').classList.contains('active')) {
+        iniciarCamara();
+    }
+}
+
+function confirmarNuevaMeta() {
+    const pass = document.getElementById('inputPassAuth').value.trim();
+    
+    // Validación estricta con la clave maestra de administrador
+    if (pass === "admin2026") {
+        guardarMetaTickets();
+        cerrarModalAuth();
+        alert("¡Meta de tickets actualizada exitosamente por el Administrador!");
+    } else {
+        alert("Acceso denegado. Contraseña incorrecta.");
+        document.getElementById('inputPassAuth').value = "";
+    }
+}
+
+// --- FUNCIONES DEL MINI-DASHBOARD ---
+function inicializarEstadisticas() {
+    const guardado = localStorage.getItem('ligaStatsVendedor');
+    if (guardado) {
+        const parsed = JSON.parse(guardado);
+        if (parsed.fecha === new Date().toLocaleDateString()) {
+            statsLocal = parsed;
+        }
+    }
+    const inputMeta = document.getElementById('inputMetaTickets');
+    if (inputMeta) inputMeta.value = statsLocal.meta;
+    actualizarUIProgreso();
+}
+
+function guardarMetaTickets() {
+    const inputMeta = document.getElementById('inputMetaTickets');
+    if (inputMeta && inputMeta.value) {
+        statsLocal.meta = parseInt(inputMeta.value) || 100;
+        localStorage.setItem('ligaStatsVendedor', JSON.stringify(statsLocal));
+        actualizarUIProgreso();
+    }
+}
+
+function incrementarContador(tipo) {
+    if (tipo === 'QR') statsLocal.qr++;
+    else if (tipo === 'JUGADOR') statsLocal.jugador++;
+    else if (tipo === 'DIRECTIVA') statsLocal.directiva++;
+    else if (tipo === 'PRESIDENTE') statsLocal.presidente++;
+    
+    localStorage.setItem('ligaStatsVendedor', JSON.stringify(statsLocal));
+    actualizarUIProgreso();
+}
+
+function actualizarUIProgreso() {
+    const barra = document.getElementById('barraProgreso');
+    const texto = document.getElementById('textoProgreso');
+    
+    if (!barra || !texto) return;
+
+    let total = statsLocal.qr + statsLocal.jugador + statsLocal.directiva + statsLocal.presidente;
+    let porcentaje = statsLocal.meta > 0 ? (total / statsLocal.meta) * 100 : 0;
+    if (porcentaje > 100) porcentaje = 100; 
+
+    barra.style.width = porcentaje + '%';
+    texto.innerText = `${total} / ${statsLocal.meta} (${Math.floor(porcentaje)}%)`;
+
+    document.getElementById('countQR').innerText = statsLocal.qr;
+    document.getElementById('countJugador').innerText = statsLocal.jugador;
+    document.getElementById('countDirectiva').innerText = statsLocal.directiva;
+    document.getElementById('countPresidente').innerText = statsLocal.presidente;
+}
+
+// --- 4. ADMIN Y RANKING ---
 async function cargarAdmin() {
     const btn = document.getElementById('btnActualizarAdmin');
     btn.innerText = "Cargando..."; btn.disabled = true;
