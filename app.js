@@ -1,16 +1,32 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby5I_Cq4yBDPtDuAB9Wfc2DWg9J9V0bB4FmCBxBLV6cHOCOvmUsPGcnrG9MvYqAKM04hQ/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwckUuup4pvDDEeM1K2b-VY5aXxlRLDbE_bRWRW3jKcTv8g94kCCJ5Pdq7Qk8o3aiWNaw/exec";
 
 let usuarioActual = "";
 let rolActual = ""; 
 
-// --- RECUPERACIÓN DE SESIÓN ---
+// --- INICIALIZACIÓN Y RECUPERACIÓN DE SESIÓN ---
 window.onload = function() {
+    // 1. Recuperación de sesión
     const usrGuardado = localStorage.getItem('ligaUsuario');
     const rolGuardado = localStorage.getItem('ligaRol');
     if (usrGuardado && rolGuardado) {
         usuarioActual = usrGuardado;
         rolActual = rolGuardado;
         accederApp(true);
+    }
+
+    // 2. Eventos UI: Controlador del selector de cantidad manual
+    const selCantidad = document.getElementById('selCantidad');
+    if(selCantidad) {
+        selCantidad.addEventListener('change', function() {
+            const inputDiv = document.getElementById('inputManual');
+            if (this.value === 'manual') {
+                inputDiv.style.display = 'block';
+                inputDiv.focus();
+            } else {
+                inputDiv.style.display = 'none';
+                inputDiv.value = ''; // Limpia el valor si se oculta
+            }
+        });
     }
 }
 
@@ -114,11 +130,28 @@ function generarCodigoUnico() {
     return codigo;
 }
 
-// --- 1. VENDER TICKETS (SOPORTE MASIVO) ---
+// --- 1. VENDER TICKETS (SOPORTE MASIVO Y MANUAL) ---
 async function procesarVenta() {
     const btn = document.getElementById('btnVender');
     const club = document.getElementById('selClub').value;
-    const cantidad = parseInt(document.getElementById('selCantidad')?.value || 1);
+    const opcionCantidad = document.getElementById('selCantidad').value;
+    
+    let cantidad = 1;
+
+    // Lógica de validación para entrada manual o predefinida
+    if (opcionCantidad === 'manual') {
+        cantidad = parseInt(document.getElementById('inputManual').value);
+        if (isNaN(cantidad) || cantidad <= 0) {
+            alert("Por favor, ingresa una cantidad manual válida mayor a 0.");
+            return;
+        }
+        if (cantidad > 50) {
+            alert("Por seguridad del sistema, el límite máximo por lote es de 50 tickets.");
+            return;
+        }
+    } else {
+        cantidad = parseInt(opcionCantidad || 1);
+    }
     
     btn.disabled = true; 
     btn.innerText = `Generando ${cantidad} ticket(s)...`;
