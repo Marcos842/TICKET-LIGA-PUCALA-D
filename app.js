@@ -1,9 +1,9 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyPF_uAMJRqnxqh8_503OmU5qIIlHteNUAr7GBgg2WF1z4JBbi8_K2zBTCKyaaQ4furlQ/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyx8ZXjg2LhrBANMdHRkCSLSDv4UsIS-Oqdib1XIXLk_1tIlRV81RgDzqfJkqQ9osjv7Q/exec";
 
 let usuarioActual = "";
 let rolActual = ""; 
 
-// --- NUEVO: ESTADO DEL MINI-DASHBOARD LOCAL ---
+// --- ESTADO DEL MINI-DASHBOARD LOCAL ---
 let statsLocal = {
     fecha: new Date().toLocaleDateString(),
     meta: 100,
@@ -41,6 +41,11 @@ window.onload = function() {
 
     // 3. Inicializar Estadísticas del Vendedor
     inicializarEstadisticas();
+
+    // 4. NUEVO: Forzar sincronización con la verdad del Drive al recargar la página
+    if(usuarioActual) {
+        sincronizarDatosConDrive();
+    }
 }
 
 // --- COMUNICACIÓN CON BACKEND ---
@@ -102,6 +107,9 @@ function accederApp(desdeMemoria) {
         document.getElementById('navAdmin').style.display = 'inline-block';
         cambiarVista('admin'); 
     }
+
+    // Al entrar a la app, actualizamos los contadores preguntándole al Drive
+    sincronizarDatosConDrive();
 }
 
 function cerrarSesion() {
@@ -125,8 +133,9 @@ function cambiarVista(id) {
     if (id === 'vender') document.getElementById('navVender').classList.add('active');
     if (id === 'scan') {
         document.getElementById('navScan').classList.add('active');
-        actualizarUIProgreso(); // Fuerza refresco visual al entrar
+        actualizarUIProgreso(); // Carga rápida de caché visual
         iniciarCamara(); 
+        sincronizarDatosConDrive(); // Re-verifica la verdad absoluta en 2do plano
     }
     if (id === 'admin') {
         document.getElementById('navAdmin').classList.add('active');
@@ -388,9 +397,9 @@ function abrirModalAuth() {
         alert("Por favor, ingresa una meta válida (mayor a 0) antes de fijar.");
         return;
     }
-    document.getElementById('inputPassAuth').value = ""; // Limpiar clave anterior
+    document.getElementById('inputPassAuth').value = ""; 
     document.getElementById('modalAuth').classList.add('active');
-    apagarCamara(); // Protege la batería y evita escaneos fantasmas
+    apagarCamara(); 
 }
 
 function cerrarModalAuth() {
@@ -403,7 +412,6 @@ function cerrarModalAuth() {
 function confirmarNuevaMeta() {
     const pass = document.getElementById('inputPassAuth').value.trim();
     
-    // Validación estricta con la clave maestra de administrador
     if (pass === "admin2026") {
         guardarMetaTickets();
         cerrarModalAuth();
@@ -414,7 +422,7 @@ function confirmarNuevaMeta() {
     }
 }
 
-// --- FUNCIONES DEL MINI-DASHBOARD ---
+// --- FUNCIONES DEL MINI-DASHBOARD Y SINCRONIZACIÓN ---
 function inicializarEstadisticas() {
     const guardado = localStorage.getItem('ligaStatsVendedor');
     if (guardado) {
@@ -426,6 +434,25 @@ function inicializarEstadisticas() {
     const inputMeta = document.getElementById('inputMetaTickets');
     if (inputMeta) inputMeta.value = statsLocal.meta;
     actualizarUIProgreso();
+}
+
+// NUEVO: Pide los datos reales al Drive y corrige el celular si hubo borrados
+async function sincronizarDatosConDrive() {
+    if(!usuarioActual) return;
+    
+    // Le decimos a Apps Script "dame el dashboard filtrado por mi usuario"
+    const res = await fetchAPI({ accion: "dashboard", usuario: usuarioActual });
+    
+    if (res && !res.error && res.statsUser) {
+        // La meta no se sobreescribe (eso es local), pero los contadores sí
+        statsLocal.qr = res.statsUser.qr;
+        statsLocal.jugador = res.statsUser.jugador;
+        statsLocal.directiva = res.statsUser.directiva;
+        statsLocal.presidente = res.statsUser.presidente;
+        
+        localStorage.setItem('ligaStatsVendedor', JSON.stringify(statsLocal));
+        actualizarUIProgreso();
+    }
 }
 
 function guardarMetaTickets() {
